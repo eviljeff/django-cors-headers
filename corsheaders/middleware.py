@@ -12,7 +12,7 @@ try:
 except ImportError:
     from django.db.models.loading import get_model
 
-from corsheaders import defaults as settings
+from corsheaders.defaults import get_active_settings
 
 
 ACCESS_CONTROL_ALLOW_ORIGIN = 'Access-Control-Allow-Origin'
@@ -30,6 +30,7 @@ class CorsPostCsrfMiddleware(object):
         Put the HTTP_REFERER back to its original value and delete the
         temporary storage
         """
+        settings = get_active_settings(request)
         if (settings.CORS_REPLACE_HTTPS_REFERER and
                 'ORIGINAL_HTTP_REFERER' in request.META):
             http_referer = request.META['ORIGINAL_HTTP_REFERER']
@@ -58,9 +59,11 @@ class CorsMiddleware(object):
 
         if (request.is_secure() and origin and
                 'ORIGINAL_HTTP_REFERER' not in request.META):
+            settings = get_active_settings(request)
             url = urlparse(origin)
             if (not settings.CORS_ORIGIN_ALLOW_ALL and
-                    self.origin_not_found_in_white_lists(origin, url)):
+                    self.origin_not_found_in_white_lists(
+                        origin, url, settings)):
                 return
 
             try:
@@ -81,10 +84,12 @@ class CorsMiddleware(object):
         view/exception middleware along with the requested view;
         it will call any response middlewares
         """
-        if self.is_enabled(request) and settings.CORS_REPLACE_HTTPS_REFERER:
+        settings = get_active_settings(request)
+        if (self.is_enabled(request, settings) and
+                settings.CORS_REPLACE_HTTPS_REFERER):
             self._https_referer_replace(request)
 
-        if (self.is_enabled(request) and
+        if (self.is_enabled(request, settings) and
                 request.method == 'OPTIONS' and
                 "HTTP_ACCESS_CONTROL_REQUEST_METHOD" in request.META):
             response = http.HttpResponse()
@@ -95,7 +100,9 @@ class CorsMiddleware(object):
         """
         Do the referer replacement here as well
         """
-        if self.is_enabled(request) and settings.CORS_REPLACE_HTTPS_REFERER:
+        settings = get_active_settings(request)
+        if (self.is_enabled(request, settings) and
+                settings.CORS_REPLACE_HTTPS_REFERER):
             self._https_referer_replace(request)
         return None
 
@@ -104,7 +111,8 @@ class CorsMiddleware(object):
         Add the respective CORS headers
         """
         origin = request.META.get('HTTP_ORIGIN')
-        if self.is_enabled(request) and origin:
+        settings = get_active_settings(request)
+        if self.is_enabled(request, settings) and origin:
             # todo: check hostname from db instead
             url = urlparse(origin)
 
@@ -114,7 +122,8 @@ class CorsMiddleware(object):
                     response[ACCESS_CONTROL_ALLOW_ORIGIN] = origin
 
             if (not settings.CORS_ORIGIN_ALLOW_ALL and
-                    self.origin_not_found_in_white_lists(origin, url)):
+                    self.origin_not_found_in_white_lists(
+                        origin, url, settings)):
                 return response
 
             response[ACCESS_CONTROL_ALLOW_ORIGIN] = "*" if (
@@ -139,14 +148,14 @@ class CorsMiddleware(object):
 
         return response
 
-    def origin_not_found_in_white_lists(self, origin, url):
+    def origin_not_found_in_white_lists(self, origin, url, settings):
         return (url.netloc not in settings.CORS_ORIGIN_WHITELIST and
-                not self.regex_domain_match(origin))
+                not self.regex_domain_match(origin, settings))
 
-    def regex_domain_match(self, origin):
+    def regex_domain_match(self, origin, settings):
         for domain_pattern in settings.CORS_ORIGIN_REGEX_WHITELIST:
             if re.match(domain_pattern, origin):
                 return origin
 
-    def is_enabled(self, request):
+    def is_enabled(self, request, settings):
         return re.match(settings.CORS_URLS_REGEX, request.path)

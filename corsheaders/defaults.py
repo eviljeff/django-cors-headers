@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 
 default_headers = (
@@ -11,8 +13,6 @@ default_headers = (
     'accept-encoding',
 )
 
-CORS_ALLOW_HEADERS = getattr(settings, 'CORS_ALLOW_HEADERS', default_headers)
-
 default_methods = (
     'GET',
     'POST',
@@ -21,28 +21,41 @@ default_methods = (
     'DELETE',
     'OPTIONS',
 )
-CORS_ALLOW_METHODS = getattr(settings, 'CORS_ALLOW_METHODS', default_methods)
 
-CORS_ALLOW_CREDENTIALS = getattr(settings, 'CORS_ALLOW_CREDENTIALS', False)
 
-CORS_PREFLIGHT_MAX_AGE = getattr(settings, 'CORS_PREFLIGHT_MAX_AGE', 86400)
+class CorsHeadersSettings(object):
+    CORS_ALLOW_HEADERS = default_headers
+    CORS_ALLOW_METHODS = default_methods
+    CORS_ALLOW_CREDENTIALS = False
+    CORS_PREFLIGHT_MAX_AGE = 86400
+    CORS_ORIGIN_ALLOW_ALL = False
+    CORS_ORIGIN_WHITELIST = ()
+    CORS_ORIGIN_REGEX_WHITELIST = ()
+    CORS_EXPOSE_HEADERS = ()
+    CORS_URLS_REGEX = '^.*$'
+    CORS_MODEL = None
+    CORS_REPLACE_HTTPS_REFERER = False
 
-CORS_ORIGIN_ALLOW_ALL = getattr(settings, 'CORS_ORIGIN_ALLOW_ALL', False)
+    def __init__(self, config, override=None):
+        if override is None:
+            override = {}
+        fields = [
+            field
+            for field in dir(CorsHeadersSettings)
+            if field.startswith('CORS_')]
+        for field in fields:
+            if hasattr(config, field):
+                setattr(self, field, getattr(config, field))
+        for field, value in override.items():
+            if field in fields:
+                setattr(self, field, value)
 
-CORS_ORIGIN_WHITELIST = getattr(settings, 'CORS_ORIGIN_WHITELIST', ())
 
-CORS_ORIGIN_REGEX_WHITELIST = getattr(
-    settings,
-    'CORS_ORIGIN_REGEX_WHITELIST',
-    ())
-
-CORS_EXPOSE_HEADERS = getattr(settings, 'CORS_EXPOSE_HEADERS', ())
-
-CORS_URLS_REGEX = getattr(settings, 'CORS_URLS_REGEX', '^.*$')
-
-CORS_MODEL = getattr(settings, 'CORS_MODEL', None)
-
-CORS_REPLACE_HTTPS_REFERER = getattr(
-    settings,
-    'CORS_REPLACE_HTTPS_REFERER',
-    False)
+def get_active_settings(request):
+    override = None
+    endpoint_overrides = getattr(settings, 'CORS_ENDPOINT_OVERRIDES', [])
+    for regex, overrides in endpoint_overrides:
+        if re.match(regex, request.path):
+            override = overrides
+            break
+    return CorsHeadersSettings(settings, override)

@@ -142,6 +142,23 @@ You may optionally specify these options in settings.py to override the defaults
 
         CORS_REPLACE_HTTPS_REFERER = False
 
+>CORS\_ENDPOINT\_OVERRIDES: a list of (regex, override) pairs that override settings for certain URLs.
+
+    Example:
+
+        CORS_ENDPOINT_OVERRIDES = [
+            (r'/api/user/.*$', {
+                'CORS_ORIGIN_WHITELIST': ['https://secure.mydomain.com'],
+            }),
+            (r'/api/public/.*$', {
+                'CORS_ORIGIN_ALLOW_ALL': True,
+            }),
+        ]
+
+    Default:
+
+        CORS_ENDPOINT_OVERRIDES = []
+
 ## Changelog ##
 v0.13 and onwards - [Release Notes](https://github.com/ottoyiu/django-cors-headers/releases)
 
