@@ -12,6 +12,13 @@ try:
 except ImportError:
     from django.db.models.loading import get_model
 
+try:
+    from django.utils.deprecation import MiddlewareMixin
+except ImportError:
+    class MiddlewareMixin(object):
+        """Dummy class not to break compatibility with django 1.8"""
+        pass
+
 from corsheaders.defaults import get_active_settings
 
 
@@ -23,7 +30,7 @@ ACCESS_CONTROL_ALLOW_METHODS = 'Access-Control-Allow-Methods'
 ACCESS_CONTROL_MAX_AGE = 'Access-Control-Max-Age'
 
 
-class CorsPostCsrfMiddleware(object):
+class CorsPostCsrfMiddleware(MiddlewareMixin):
 
     def _https_referer_replace_reverse(self, request):
         """
@@ -46,7 +53,7 @@ class CorsPostCsrfMiddleware(object):
         return None
 
 
-class CorsMiddleware(object):
+class CorsMiddleware(MiddlewareMixin):
 
     def _https_referer_replace(self, request):
         """
